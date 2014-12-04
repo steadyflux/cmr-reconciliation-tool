@@ -38,7 +38,7 @@ ECHO_DB = SQLite3::Database.new('echo_collections.db')
 
 
 
-def get_dif entry_id
+def get_dif(entry_id)
   if entry_id.empty?
     return "NO ENTRY ID"
   end
@@ -47,9 +47,19 @@ def get_dif entry_id
   (dif_record == nil) ? "MISSING" : dif_record[2]
 end
 
-def get_echo entry_id
-  echo_record = ECHO_DB.execute("select * from collections WHERE associated_dif LIKE \'#{entry_id}\'")[0]
-  (echo_record == nil) ? "MISSING" : echo_record[3]  
+def get_echo_from_entry_id(entry_id, provider)
+  echo_record = ECHO_DB.execute("select * from collections WHERE associated_dif LIKE \'#{entry_id}\' and collection_id LIKE \'%#{provider}%\'")[0]
+  (echo_record == nil) ? "MISSING" : [echo_record[3], echo_record[0]] 
+end
+
+def guess_echo_from_short_name(entry_id, provider)
+  echo_record = ECHO_DB.execute("select * from collections WHERE short_name LIKE \'#{entry_id}\' and collection_id LIKE \'%#{provider}%\'")[0]
+  (echo_record == nil) ? nil : [echo_record[3], echo_record[0]]
+end
+
+def guess_echo_from_datasetID(entry_title, provider)
+  echo_record = ECHO_DB.execute("select * from collections WHERE datasetID LIKE \'%#{entry_title}%\' and collection_id LIKE \'%#{provider}%\'")[0]
+  (echo_record == nil) ? nil : [echo_record[3], echo_record[0]]
 end
 
 def build_reconciliation_report statement, outfile=nil, verbose=false
@@ -94,26 +104,45 @@ end
 def build_dif_reconciliation_report statement, provider=nil, outfile=nil, verbose=false
   count = 0
   missing = []
+  shortNameGuess = []
+  datasetIDGuess = []
   DIF_DB.execute(statement) do |row|
     dif = row[2]
     if provider
       XpathHelpers.find_xpath("/DIF/Data_Center/Data_Center_Name/Short_Name", dif).to_a.map do |a|
         if a.text.include? provider
           entry_id = row[0][6..-1]
+          entry_title = XpathHelpers.find_xpath("/DIF/Entry_Title", row[2]).text
           count += 1
-          echo = get_echo(entry_id)
+          echo, id = get_echo_from_entry_id(entry_id, "NSIDC")
           if echo == "MISSING"
-            puts "'#{entry_id}' is MISSING"
-            missing << entry_id
+            missing << "#{entry_id}"
+            echo, id = guess_echo_from_short_name(entry_id, "NSIDC")
+            if echo
+              shortNameGuess << "#{XpathHelpers.find_xpath("/Collection/ShortName", echo).text}, #{id}"
+            else
+              echo, id = guess_echo_from_datasetID(entry_title, "NSIDC")
+              if echo
+                datasetIDGuess << "#{XpathHelpers.find_xpath("/Collection/DataSetId", echo).text}, #{id}"
+              end
+            end
           end
         end
       end
     end
   end
-  puts "#{count}. #{missing_count} missing"
+  
   puts "missing:" 
   missing.map {|a| puts a }
-
+  3.times {puts ":::"} 
+  puts "short name:"
+  shortNameGuess.map {|a| puts a}
+  puts "datasetID:"
+  datasetIDGuess.map {|a| puts a }
+  puts "Total GCMD Entries: #{count}"
+  puts "#{missing.length} missing ECHO associated mappings."
+  puts "#{shortNameGuess.length} potential matches based on shortName Guesses."
+  puts "#{datasetIDGuess.length} potential matches based on datasetID Guesses."
 end
 
 def reconcile_single_echo_record collection_id, verbose=false
