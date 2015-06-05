@@ -13,7 +13,7 @@ class FieldStat
   def xml_compare(dif, echo)
     dif_value = (dif == "MISSING" || dif == "NO ENTRY ID") ? dif : XpathHelpers.find_xpath(@dif_xpath, dif).text
     echo_value = XpathHelpers.find_xpath(@echo_xpath, echo).text
-    addStat(echo_value, dif_value)
+    addStat(echo, echo_value, dif_value)
 
     if @verbose
       puts "\t#{@field_name} (Match = #{XpathHelpers.isEqual?(dif_value, echo_value)})"
@@ -23,12 +23,11 @@ class FieldStat
       else
         puts "\t#{@dif_xpath} | #{dif_value[0..80]}" 
       end
-      puts "\t#{@echo_xpath} | #{echo_value[0..80]}"
-      puts
+      puts "\t#{@echo_xpath} | #{echo_value[0..80]}\n"
     end
   end  
 
-  def addStat(echo_value, dif_value)
+  def addStat(echo, echo_value, dif_value)
     @total_stats += 1
     if XpathHelpers.isEqual?(dif_value, echo_value)
       @total_match += 1
@@ -52,7 +51,8 @@ class FieldStat
   end
 
   def statCSV
-    "#{@field_name},#{@total_stats},#{@total_match},#{@total_missing_dif},#{@total_missing_entry_id},#{@total_match.to_f/@total_stats.to_f*100}\n"
+    # "#{@field_name},#{@total_stats},#{@total_match},#{@total_missing_dif},#{@total_missing_entry_id},#{@total_match.to_f/@total_stats.to_f*100}\n"
+    "#{@field_name},#{@total_stats},#{@total_match},#{@total_match.to_f/@total_stats.to_f*100}\n"
   end
 
 end

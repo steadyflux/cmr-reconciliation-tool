@@ -1,6 +1,12 @@
-*.db
 *.gem
 *.rbc
+*.pdf
+*.yml
+*.old
+*.txt
+*.db
+temp
+junk.rb
 /.config
 /coverage/
 /InstalledFiles
